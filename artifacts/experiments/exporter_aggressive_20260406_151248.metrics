@@ -1,0 +1,241 @@
+# HELP ch_exporter_build_info Build metadata (value is always 1).
+# TYPE ch_exporter_build_info gauge
+ch_exporter_build_info{version="dev"} 1
+# HELP ch_exporter_merges_active Active merges (rows in system.merges).
+# TYPE ch_exporter_merges_active gauge
+ch_exporter_merges_active 0
+# HELP ch_exporter_mutations_unfinished Mutations with is_done = 0.
+# TYPE ch_exporter_mutations_unfinished gauge
+ch_exporter_mutations_unfinished 0
+# HELP ch_exporter_parts_active_total Active data parts (system.parts WHERE active).
+# TYPE ch_exporter_parts_active_total gauge
+ch_exporter_parts_active_total 0
+# HELP ch_exporter_replicas_max_absolute_delay Max absolute_delay across system.replicas.
+# TYPE ch_exporter_replicas_max_absolute_delay gauge
+ch_exporter_replicas_max_absolute_delay 0
+# HELP ch_exporter_replicas_total Number of rows in system.replicas.
+# TYPE ch_exporter_replicas_total gauge
+ch_exporter_replicas_total 0
+# HELP ch_exporter_scrape_errors_total Errors per logical step during scrape.
+# TYPE ch_exporter_scrape_errors_total counter
+ch_exporter_scrape_errors_total{step="async_metrics"} 1
+ch_exporter_scrape_errors_total{step="disks"} 1
+ch_exporter_scrape_errors_total{step="merges_mutations"} 1
+ch_exporter_scrape_errors_total{step="parts_summary"} 1
+ch_exporter_scrape_errors_total{step="parts_top"} 1
+ch_exporter_scrape_errors_total{step="replicas"} 1
+ch_exporter_scrape_errors_total{step="system_events"} 1
+ch_exporter_scrape_errors_total{step="system_metrics"} 1
+# HELP ch_exporter_scrape_step_duration_seconds Duration of scrape steps.
+# TYPE ch_exporter_scrape_step_duration_seconds histogram
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="0.005"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="0.01"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="0.025"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="0.05"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="0.1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="0.25"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="0.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="2.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="10"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="async_metrics",le="+Inf"} 1
+ch_exporter_scrape_step_duration_seconds_sum{step="async_metrics"} 0.001031875
+ch_exporter_scrape_step_duration_seconds_count{step="async_metrics"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="0.005"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="0.01"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="0.025"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="0.05"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="0.1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="0.25"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="0.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="2.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="10"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="disks",le="+Inf"} 1
+ch_exporter_scrape_step_duration_seconds_sum{step="disks"} 0.000832875
+ch_exporter_scrape_step_duration_seconds_count{step="disks"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="0.005"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="0.01"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="0.025"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="0.05"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="0.1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="0.25"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="0.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="2.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="10"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="merges_mutations",le="+Inf"} 1
+ch_exporter_scrape_step_duration_seconds_sum{step="merges_mutations"} 0.001082083
+ch_exporter_scrape_step_duration_seconds_count{step="merges_mutations"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="0.005"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="0.01"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="0.025"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="0.05"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="0.1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="0.25"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="0.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="2.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="10"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_summary",le="+Inf"} 1
+ch_exporter_scrape_step_duration_seconds_sum{step="parts_summary"} 0.000764125
+ch_exporter_scrape_step_duration_seconds_count{step="parts_summary"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="0.005"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="0.01"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="0.025"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="0.05"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="0.1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="0.25"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="0.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="2.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="10"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="parts_top",le="+Inf"} 1
+ch_exporter_scrape_step_duration_seconds_sum{step="parts_top"} 0.000742625
+ch_exporter_scrape_step_duration_seconds_count{step="parts_top"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="0.005"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="0.01"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="0.025"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="0.05"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="0.1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="0.25"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="0.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="2.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="10"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="replicas",le="+Inf"} 1
+ch_exporter_scrape_step_duration_seconds_sum{step="replicas"} 0.000809291
+ch_exporter_scrape_step_duration_seconds_count{step="replicas"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="0.005"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="0.01"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="0.025"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="0.05"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="0.1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="0.25"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="0.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="2.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="10"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_events",le="+Inf"} 1
+ch_exporter_scrape_step_duration_seconds_sum{step="system_events"} 0.00111875
+ch_exporter_scrape_step_duration_seconds_count{step="system_events"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="0.005"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="0.01"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="0.025"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="0.05"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="0.1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="0.25"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="0.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="1"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="2.5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="5"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="10"} 1
+ch_exporter_scrape_step_duration_seconds_bucket{step="system_metrics",le="+Inf"} 1
+ch_exporter_scrape_step_duration_seconds_sum{step="system_metrics"} 0.001901875
+ch_exporter_scrape_step_duration_seconds_count{step="system_metrics"} 1
+# HELP ch_exporter_up 1 if ClickHouse responded to ping during last scrape.
+# TYPE ch_exporter_up gauge
+ch_exporter_up 0
+# HELP go_build_info Build information about the main Go module.
+# TYPE go_build_info gauge
+go_build_info{checksum="",path="github.com/DSugakov/prometheus-exporter-clickhouse",version="(devel)"} 1
+# HELP go_gc_duration_seconds A summary of the wall-time pause (stop-the-world) duration in garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 0
+go_gc_duration_seconds{quantile="0.25"} 0
+go_gc_duration_seconds{quantile="0.5"} 0
+go_gc_duration_seconds{quantile="0.75"} 0
+go_gc_duration_seconds{quantile="1"} 0
+go_gc_duration_seconds_sum 0
+go_gc_duration_seconds_count 0
+# HELP go_gc_gogc_percent Heap size target percentage configured by the user, otherwise 100. This value is set by the GOGC environment variable, and the runtime/debug.SetGCPercent function. Sourced from /gc/gogc:percent
+# TYPE go_gc_gogc_percent gauge
+go_gc_gogc_percent 100
+# HELP go_gc_gomemlimit_bytes Go runtime memory limit configured by the user, otherwise math.MaxInt64. This value is set by the GOMEMLIMIT environment variable, and the runtime/debug.SetMemoryLimit function. Sourced from /gc/gomemlimit:bytes
+# TYPE go_gc_gomemlimit_bytes gauge
+go_gc_gomemlimit_bytes 9.223372036854776e+18
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 9
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.23.3"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated in heap and currently in use. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 314912
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated in heap until now, even if released already. Equals to /gc/heap/allocs:bytes.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 314912
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table. Equals to /memory/classes/profiling/buckets:bytes.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 4355
+# HELP go_memstats_frees_total Total number of heap objects frees. Equals to /gc/heap/frees:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 0
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata. Equals to /memory/classes/metadata/other:bytes.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 1.527424e+06
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and currently in use, same as go_memstats_alloc_bytes. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 314912
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used. Equals to /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 1.630208e+06
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 2.039808e+06
+# HELP go_memstats_heap_objects Number of currently allocated objects. Equals to /gc/heap/objects:objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 854
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS. Equals to /memory/classes/heap/released:bytes.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 1.630208e+06
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes + /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 3.670016e+06
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 0
+# HELP go_memstats_mallocs_total Total number of heap objects allocated, both live and gc-ed. Semantically a counter version for go_memstats_heap_objects gauge. Equals to /gc/heap/allocs:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 854
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures. Equals to /memory/classes/metadata/mcache/inuse:bytes.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 12000
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system. Equals to /memory/classes/metadata/mcache/inuse:bytes + /memory/classes/metadata/mcache/free:bytes.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 15600
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures. Equals to /memory/classes/metadata/mspan/inuse:bytes.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 55200
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system. Equals to /memory/classes/metadata/mspan/inuse:bytes + /memory/classes/metadata/mspan/free:bytes.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 65280
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place. Equals to /gc/heap/goal:bytes.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 4.194304e+06
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations. Equals to /memory/classes/other:bytes.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 1.159325e+06
+# HELP go_memstats_stack_inuse_bytes Number of bytes obtained from system for stack allocator in non-CGO environments. Equals to /memory/classes/heap/stacks:bytes.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 524288
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator. Equals to /memory/classes/heap/stacks:bytes + /memory/classes/os-stacks:bytes.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 524288
+# HELP go_memstats_sys_bytes Number of bytes obtained from system. Equals to /memory/classes/total:byte.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 6.966288e+06
+# HELP go_sched_gomaxprocs_threads The current runtime.GOMAXPROCS setting, or the number of operating system threads that can execute user-level Go code simultaneously. Sourced from /sched/gomaxprocs:threads
+# TYPE go_sched_gomaxprocs_threads gauge
+go_sched_gomaxprocs_threads 10
+# HELP go_threads Number of OS threads created.
+# TYPE go_threads gauge
+go_threads 9

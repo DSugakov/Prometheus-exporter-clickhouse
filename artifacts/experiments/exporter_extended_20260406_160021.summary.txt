@@ -1,0 +1,6 @@
+profile=extended
+metrics_file=./artifacts/experiments/exporter_extended_20260406_160021.metrics
+unique_metric_names=1359
+series_count=1359
+scrape_bucket_lines=0
+collected_at=2026-04-06T13:00:21Z

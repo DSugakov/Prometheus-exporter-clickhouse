@@ -1,0 +1,6 @@
+profile=aggressive
+metrics_file=./artifacts/experiments/exporter_aggressive_20260406_160025.metrics
+unique_metric_names=1380
+series_count=1380
+scrape_bucket_lines=0
+collected_at=2026-04-06T13:00:25Z

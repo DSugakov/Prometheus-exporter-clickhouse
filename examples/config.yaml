@@ -1,0 +1,10 @@
+listen_address: ":9101"
+address: "localhost:9000"
+database: "default"
+username: "default"
+password: "clickhouse"
+profile: "safe"
+collect_timeout: 25s
+query_timeout: 20s
+max_open_conns: 4
+parts_top_n: 20

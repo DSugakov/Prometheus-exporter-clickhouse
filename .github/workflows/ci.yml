@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+      - name: Mod tidy
+        run: go mod tidy
+      - name: Unit tests
+        run: go test -race ./...
+      - name: Build
+        run: go build -o /dev/null ./cmd/ch-exporter/
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.60
+
+  integration-smoke:
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+      - name: Build exporter binary
+        run: go build -o ./bin/ch-exporter ./cmd/ch-exporter/
+      - name: Start ClickHouse
+        run: docker compose up -d clickhouse
+      - name: Run smoke integration
+        run: |
+          chmod +x ./scripts/integration_smoke.sh
+          ./scripts/integration_smoke.sh ./bin/ch-exporter
+      - name: Dump compose logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop compose
+        if: always()
+        run: docker compose down -v

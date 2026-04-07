@@ -1,0 +1,17 @@
+{
+  "title": "ClickHouse exporter (overview)",
+  "panels": [
+    {
+      "title": "ch_exporter_up",
+      "type": "stat",
+      "targets": [{ "expr": "ch_exporter_up" }]
+    },
+    {
+      "title": "Scrape errors",
+      "type": "timeseries",
+      "targets": [{ "expr": "rate(ch_exporter_scrape_errors_total[5m])" }]
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

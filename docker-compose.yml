@@ -1,0 +1,27 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_USER: "default"
+      CLICKHOUSE_PASSWORD: "clickhouse"
+      CLICKHOUSE_DB: "default"
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  exporter:
+    build: .
+    ports:
+      - "9101:9101"
+    environment:
+      CH_EXPORTER_ADDRESS: "clickhouse:9000"
+      CH_EXPORTER_USERNAME: "default"
+      CH_EXPORTER_PASSWORD: "clickhouse"
+      CH_EXPORTER_PROFILE: "extended"
+      CH_EXPORTER_LISTEN_ADDRESS: ":9101"
+    depends_on:
+      - clickhouse

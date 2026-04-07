@@ -1,0 +1,17 @@
+groups:
+  - name: clickhouse_exporter
+    rules:
+      - alert: ClickHouseExporterDown
+        expr: ch_exporter_up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Exporter cannot reach ClickHouse"
+      - alert: ClickHouseExporterScrapeErrors
+        expr: rate(ch_exporter_scrape_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "Frequent scrape step errors"
