@@ -18,3 +18,22 @@ func TestProfileInvalid(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+
+func TestTimeoutInvalid(t *testing.T) {
+	c := Default()
+	c.Address = "x:9000"
+	c.QueryTimeout = 0
+	if err := c.Validate(); err == nil {
+		t.Fatal("expected error for zero query timeout")
+	}
+}
+
+func TestPartsTopNHardLimit(t *testing.T) {
+	c := Default()
+	c.Address = "x:9000"
+	c.PartsTopN = AggressiveHardMaxPartsTopN + 1
+	if err := c.Validate(); err == nil {
+		t.Fatal("expected error for parts_top_n hard limit")
+	}
+}

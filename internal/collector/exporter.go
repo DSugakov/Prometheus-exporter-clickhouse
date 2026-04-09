@@ -3,6 +3,8 @@ package collector
 import (
 	"context"
 	"log/slog"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -37,12 +39,29 @@ type Exporter struct {
 
 	// Aggressive only
 	partsPerTable *prometheus.GaugeVec
+	// Demonstration step metric
+	demoSystemOne prometheus.Gauge
 
 	scrapeErrors *prometheus.CounterVec
 	scrapeDur    *prometheus.HistogramVec
+	stepEnabled  *prometheus.GaugeVec
+	stepLastOK   *prometheus.GaugeVec
+	stepLastErr  *prometheus.GaugeVec
 
 	extended bool
 	aggr     bool
+
+	stepMu        sync.RWMutex
+	disabledSteps map[string]bool
+	collectMu     sync.Mutex
+
+	systemMetricFilter nameFilter
+	systemEventFilter  nameFilter
+	asyncMetricFilter  nameFilter
+	partsDBFilter      nameFilter
+
+	registry []CollectorStep
+	steps    []CollectorStep
 }
 
 // New registers metrics on reg and returns Exporter.
@@ -87,6 +106,27 @@ func New(cfg *config.Config, conn driver.Conn, logger *slog.Logger, version stri
 			Help:      "Duration of scrape steps.",
 			Buckets:   prometheus.DefBuckets,
 		}, []string{"step"}),
+		stepEnabled: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "collector_enabled",
+			Help:      "1 when collector step is enabled, 0 when disabled by fail-safe.",
+		}, []string{"step"}),
+		stepLastOK: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "collector_last_success_unix",
+			Help:      "Unix timestamp of last successful collector step run.",
+		}, []string{"step"}),
+		stepLastErr: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "collector_last_error_unix",
+			Help:      "Unix timestamp of last failed collector step run.",
+		}, []string{"step"}),
+		disabledSteps: map[string]bool{},
+		systemMetricFilter: newNameFilter(cfg.SystemMetricAllowlist, cfg.SystemMetricDenylist),
+		systemEventFilter:  newNameFilter(cfg.SystemEventAllowlist, cfg.SystemEventDenylist),
+		asyncMetricFilter:  newNameFilter(cfg.AsyncMetricAllowlist, cfg.AsyncMetricDenylist),
+		partsDBFilter:      newNameFilter(cfg.PartsDatabaseAllowlist, cfg.PartsDatabaseDenylist),
+		registry:           buildStepRegistry(),
 	}
 
 	e.buildInfo.WithLabelValues(version).Set(1)
@@ -129,6 +169,11 @@ func New(cfg *config.Config, conn driver.Conn, logger *slog.Logger, version stri
 			Name:      "disk_total_bytes",
 			Help:      "Total space per disk from system.disks.",
 		}, []string{"disk"})
+		e.demoSystemOne = prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "demo_system_one",
+			Help:      "Demonstration metric from SELECT 1 on system.one.",
+		})
 		if cfg.Profile == config.ProfileAggressive {
 			e.aggr = true
 			e.partsPerTable = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -138,6 +183,7 @@ func New(cfg *config.Config, conn driver.Conn, logger *slog.Logger, version stri
 			}, []string{"database", "table"})
 		}
 	}
+	e.steps = selectSteps(cfg.Profile, e.registry)
 
 	reg.MustRegister(e)
 	return e
@@ -162,12 +208,21 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	if e.aggr {
 		e.partsPerTable.Describe(ch)
 	}
+	if e.extended {
+		e.demoSystemOne.Describe(ch)
+	}
 	e.scrapeErrors.Describe(ch)
 	e.scrapeDur.Describe(ch)
+	e.stepEnabled.Describe(ch)
+	e.stepLastOK.Describe(ch)
+	e.stepLastErr.Describe(ch)
 }
 
 // Collect implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+	e.collectMu.Lock()
+	defer e.collectMu.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), e.cfg.CollectTimeout)
 	defer cancel()
 
@@ -189,28 +244,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		e.up.Set(1)
 	}
 
-	step := func(name string, fn func(context.Context) error) {
-		t0 := time.Now()
-		if err := fn(ctx); err != nil {
-			e.scrapeErrors.WithLabelValues(name).Inc()
-			e.logger.Warn("scrape step failed", "step", name, "err", err)
-		}
-		dt := time.Since(t0).Seconds()
-		e.scrapeDur.WithLabelValues(name).Observe(dt)
-	}
-
-	step("system_metrics", e.collectSystemMetrics)
-	step("system_events", e.collectSystemEvents)
-	step("async_metrics", e.collectAsyncMetrics)
-
-	if e.extended {
-		step("replicas", e.collectReplicas)
-		step("merges_mutations", e.collectMergesMutations)
-		step("disks", e.collectDisks)
-		step("parts_summary", e.collectPartsSummary)
-	}
-	if e.aggr {
-		step("parts_top", e.collectPartsTop)
+	for _, s := range e.steps {
+		local := s
+		_ = e.executeStep(ctx, local.Name(), func(stepCtx context.Context) error {
+			return local.Collect(stepCtx, e.conn, e)
+		})
 	}
 
 	e.up.Collect(ch)
@@ -230,6 +268,82 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	if e.aggr {
 		e.partsPerTable.Collect(ch)
 	}
+	if e.extended {
+		e.demoSystemOne.Collect(ch)
+	}
 	e.scrapeErrors.Collect(ch)
 	e.scrapeDur.Collect(ch)
+	e.stepEnabled.Collect(ch)
+	e.stepLastOK.Collect(ch)
+	e.stepLastErr.Collect(ch)
+}
+
+func (e *Exporter) executeStep(ctx context.Context, name string, fn func(context.Context) error) error {
+	if e.isStepDisabled(name) {
+		e.stepEnabled.WithLabelValues(name).Set(0)
+		return nil
+	}
+	e.stepEnabled.WithLabelValues(name).Set(1)
+
+	stepCtx := ctx
+	cancelStep := func() {}
+	if e.cfg.QueryTimeout > 0 {
+		stepCtx, cancelStep = context.WithTimeout(ctx, e.cfg.QueryTimeout)
+	}
+	defer cancelStep()
+
+	t0 := time.Now()
+	err := fn(stepCtx)
+	if err != nil {
+		e.stepLastErr.WithLabelValues(name).Set(float64(time.Now().Unix()))
+		if isUnsupportedSchemaError(err) {
+			e.disableStep(name, err)
+			e.stepEnabled.WithLabelValues(name).Set(0)
+			e.scrapeDur.WithLabelValues(name).Observe(time.Since(t0).Seconds())
+			return nil
+		}
+		e.scrapeErrors.WithLabelValues(name).Inc()
+		e.logger.Warn("scrape step failed", "step", name, "err", err)
+	} else {
+		e.stepLastOK.WithLabelValues(name).Set(float64(time.Now().Unix()))
+	}
+	e.scrapeDur.WithLabelValues(name).Observe(time.Since(t0).Seconds())
+	return nil
+}
+
+func (e *Exporter) isStepDisabled(step string) bool {
+	e.stepMu.RLock()
+	defer e.stepMu.RUnlock()
+	return e.disabledSteps[step]
+}
+
+func (e *Exporter) disableStep(step string, err error) {
+	e.stepMu.Lock()
+	already := e.disabledSteps[step]
+	if !already {
+		e.disabledSteps[step] = true
+	}
+	e.stepMu.Unlock()
+	if already {
+		return
+	}
+	e.logger.Warn(
+		"collector step disabled due to unsupported schema",
+		"step",
+		step,
+		"err",
+		err,
+	)
+}
+
+func isUnsupportedSchemaError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "unknown table") ||
+		strings.Contains(s, "there is no column") ||
+		strings.Contains(s, "unknown identifier") ||
+		strings.Contains(s, "cannot find column") ||
+		strings.Contains(s, "doesn't exist")
 }

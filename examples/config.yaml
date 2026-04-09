@@ -8,3 +8,14 @@ collect_timeout: 25s
 query_timeout: 20s
 max_open_conns: 4
 parts_top_n: 20
+# Optional cardinality controls (exact names):
+# system_metric_allowlist: ["Query", "MemoryTracking"]
+# system_metric_denylist: ["OSCPUVirtualTimeMicroseconds"]
+# system_event_allowlist: ["SelectQuery", "InsertQuery"]
+# system_event_denylist: []
+# async_metric_allowlist: []
+# async_metric_denylist: []
+#
+# Optional aggressive-label controls:
+# parts_database_allowlist: ["default", "analytics"]
+# parts_database_denylist: ["system"]

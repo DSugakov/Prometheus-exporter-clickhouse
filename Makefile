@@ -1,4 +1,4 @@
-.PHONY: preflight build test lint integration-smoke metrics-snapshot baseline-compare ci docker
+.PHONY: preflight build test lint integration-smoke metrics-snapshot baseline-compare ci docker run-safe run-extended run-aggressive
 preflight:
 	chmod +x ./scripts/preflight.sh
 	./scripts/preflight.sh
@@ -28,3 +28,12 @@ ci: test lint integration-smoke
 
 docker:
 	docker build -t clickhouse-prometheus-exporter:local .
+
+run-safe:
+	go run ./cmd/ch-exporter -config examples/profiles/safe.yaml
+
+run-extended:
+	go run ./cmd/ch-exporter -config examples/profiles/extended.yaml
+
+run-aggressive:
+	go run ./cmd/ch-exporter -config examples/profiles/aggressive.yaml

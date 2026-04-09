@@ -1,0 +1,24 @@
+listen_address: ":9101"
+address: "localhost:9000"
+database: "default"
+username: "default"
+password: "clickhouse"
+
+profile: "safe"
+collect_timeout: 20s
+query_timeout: 8s
+max_open_conns: 2
+
+# Not used in safe, kept for compatibility.
+parts_top_n: 20
+
+# Conservative defaults: collect all base system metrics/events.
+system_metric_allowlist: []
+system_metric_denylist: []
+system_event_allowlist: []
+system_event_denylist: []
+async_metric_allowlist: []
+async_metric_denylist: []
+
+parts_database_allowlist: []
+parts_database_denylist: ["system"]

@@ -40,6 +40,18 @@ type Config struct {
 
 	// PartsTopN limits aggressive collector labels (database, table pairs).
 	PartsTopN int `yaml:"parts_top_n"`
+
+	// Optional exact-name filters for high-cardinality control.
+	SystemMetricAllowlist []string `yaml:"system_metric_allowlist"`
+	SystemMetricDenylist  []string `yaml:"system_metric_denylist"`
+	SystemEventAllowlist  []string `yaml:"system_event_allowlist"`
+	SystemEventDenylist   []string `yaml:"system_event_denylist"`
+	AsyncMetricAllowlist  []string `yaml:"async_metric_allowlist"`
+	AsyncMetricDenylist   []string `yaml:"async_metric_denylist"`
+
+	// Optional label-level control for aggressive table labels.
+	PartsDatabaseAllowlist []string `yaml:"parts_database_allowlist"`
+	PartsDatabaseDenylist  []string `yaml:"parts_database_denylist"`
 }
 
 // TLS optional client settings.
@@ -49,6 +61,8 @@ type TLS struct {
 	ServerName string `yaml:"server_name"`
 	Insecure   bool   `yaml:"insecure_skip_verify"`
 }
+
+const AggressiveHardMaxPartsTopN = 100
 
 // Default returns sensible defaults.
 func Default() *Config {
@@ -91,6 +105,16 @@ func ApplyEnv(c *Config) {
 	if v := os.Getenv("CH_EXPORTER_PROFILE"); v != "" {
 		c.Profile = Profile(v)
 	}
+	if v := os.Getenv("CH_EXPORTER_COLLECT_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			c.CollectTimeout = d
+		}
+	}
+	if v := os.Getenv("CH_EXPORTER_QUERY_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			c.QueryTimeout = d
+		}
+	}
 	if v := os.Getenv("CH_EXPORTER_TLS_CA_FILE"); v != "" {
 		c.TLS.CAFile = v
 		c.TLS.Enabled = true
@@ -109,6 +133,30 @@ func ApplyEnv(c *Config) {
 			c.PartsTopN = n
 		}
 	}
+	if v := os.Getenv("CH_EXPORTER_SYSTEM_METRIC_ALLOWLIST"); v != "" {
+		c.SystemMetricAllowlist = parseCSV(v)
+	}
+	if v := os.Getenv("CH_EXPORTER_SYSTEM_METRIC_DENYLIST"); v != "" {
+		c.SystemMetricDenylist = parseCSV(v)
+	}
+	if v := os.Getenv("CH_EXPORTER_SYSTEM_EVENT_ALLOWLIST"); v != "" {
+		c.SystemEventAllowlist = parseCSV(v)
+	}
+	if v := os.Getenv("CH_EXPORTER_SYSTEM_EVENT_DENYLIST"); v != "" {
+		c.SystemEventDenylist = parseCSV(v)
+	}
+	if v := os.Getenv("CH_EXPORTER_ASYNC_METRIC_ALLOWLIST"); v != "" {
+		c.AsyncMetricAllowlist = parseCSV(v)
+	}
+	if v := os.Getenv("CH_EXPORTER_ASYNC_METRIC_DENYLIST"); v != "" {
+		c.AsyncMetricDenylist = parseCSV(v)
+	}
+	if v := os.Getenv("CH_EXPORTER_PARTS_DATABASE_ALLOWLIST"); v != "" {
+		c.PartsDatabaseAllowlist = parseCSV(v)
+	}
+	if v := os.Getenv("CH_EXPORTER_PARTS_DATABASE_DENYLIST"); v != "" {
+		c.PartsDatabaseDenylist = parseCSV(v)
+	}
 }
 
 // Validate checks required fields.
@@ -121,5 +169,30 @@ func (c *Config) Validate() error {
 	default:
 		return fmt.Errorf("unknown profile: %q (use safe, extended, aggressive)", c.Profile)
 	}
+	if c.CollectTimeout <= 0 {
+		return fmt.Errorf("collect_timeout must be > 0")
+	}
+	if c.QueryTimeout <= 0 {
+		return fmt.Errorf("query_timeout must be > 0")
+	}
+	if c.PartsTopN <= 0 {
+		return fmt.Errorf("parts_top_n must be > 0")
+	}
+	if c.PartsTopN > AggressiveHardMaxPartsTopN {
+		return fmt.Errorf("parts_top_n must be <= %d", AggressiveHardMaxPartsTopN)
+	}
 	return nil
+}
+
+func parseCSV(v string) []string {
+	raw := strings.Split(v, ",")
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		s := strings.TrimSpace(item)
+		if s == "" {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }

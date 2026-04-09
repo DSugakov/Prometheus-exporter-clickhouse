@@ -6,8 +6,8 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 )
 
-func (e *Exporter) collectSystemMetrics(ctx context.Context) error {
-	rows, err := e.conn.Query(ctx, `SELECT metric, value FROM system.metrics`)
+func collectSystemMetricsStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
+	rows, err := conn.Query(ctx, `SELECT metric, value FROM system.metrics`)
 	if err != nil {
 		return err
 	}
@@ -18,13 +18,13 @@ func (e *Exporter) collectSystemMetrics(ctx context.Context) error {
 		if err := rows.Scan(&name, &val); err != nil {
 			return err
 		}
-		e.systemMetric.WithLabelValues(name).Set(float64(val))
+		sink.ObserveSystemMetric(name, float64(val))
 	}
 	return rows.Err()
 }
 
-func (e *Exporter) collectSystemEvents(ctx context.Context) error {
-	rows, err := e.conn.Query(ctx, `SELECT event, value FROM system.events`)
+func collectSystemEventsStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
+	rows, err := conn.Query(ctx, `SELECT event, value FROM system.events`)
 	if err != nil {
 		return err
 	}
@@ -35,13 +35,13 @@ func (e *Exporter) collectSystemEvents(ctx context.Context) error {
 		if err := rows.Scan(&name, &val); err != nil {
 			return err
 		}
-		e.systemEvent.WithLabelValues(name).Set(float64(val))
+		sink.ObserveSystemEvent(name, float64(val))
 	}
 	return rows.Err()
 }
 
-func (e *Exporter) collectAsyncMetrics(ctx context.Context) error {
-	rows, err := e.conn.Query(ctx, `SELECT metric, value FROM system.asynchronous_metrics`)
+func collectAsyncMetricsStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
+	rows, err := conn.Query(ctx, `SELECT metric, value FROM system.asynchronous_metrics`)
 	if err != nil {
 		return err
 	}
@@ -52,14 +52,14 @@ func (e *Exporter) collectAsyncMetrics(ctx context.Context) error {
 		if err := rows.Scan(&name, &val); err != nil {
 			return err
 		}
-		e.asyncMetric.WithLabelValues(name).Set(val)
+		sink.ObserveAsyncMetric(name, val)
 	}
 	return rows.Err()
 }
 
-func (e *Exporter) collectReplicas(ctx context.Context) error {
+func collectReplicasStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	var cnt, maxDelay uint64
-	rows, err := e.conn.Query(ctx, `
+	rows, err := conn.Query(ctx, `
 		SELECT count(), coalesce(max(absolute_delay), 0)
 		FROM system.replicas
 	`)
@@ -73,28 +73,30 @@ func (e *Exporter) collectReplicas(ctx context.Context) error {
 	if err := rows.Scan(&cnt, &maxDelay); err != nil {
 		return err
 	}
-	e.replicasTotal.Set(float64(cnt))
-	e.replicasMaxDelay.Set(float64(maxDelay))
+	sink.SetReplicas(float64(cnt), float64(maxDelay))
 	return rows.Err()
 }
 
-func (e *Exporter) collectMergesMutations(ctx context.Context) error {
+func collectMergesStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	var merges uint64
-	if err := scanOneUint64(ctx, e.conn, `SELECT count() FROM system.merges`, &merges); err != nil {
+	if err := scanOneUint64(ctx, conn, `SELECT count() FROM system.merges`, &merges); err != nil {
 		return err
 	}
-	e.mergesActive.Set(float64(merges))
-
-	var mut uint64
-	if err := scanOneUint64(ctx, e.conn, `SELECT count() FROM system.mutations WHERE is_done = 0`, &mut); err != nil {
-		return err
-	}
-	e.mutationsRunning.Set(float64(mut))
+	sink.SetMergesActive(float64(merges))
 	return nil
 }
 
-func (e *Exporter) collectDisks(ctx context.Context) error {
-	rows, err := e.conn.Query(ctx, `SELECT name, free_space, total_space FROM system.disks`)
+func collectMutationsStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
+	var mut uint64
+	if err := scanOneUint64(ctx, conn, `SELECT count() FROM system.mutations WHERE is_done = 0`, &mut); err != nil {
+		return err
+	}
+	sink.SetMutationsRunning(float64(mut))
+	return nil
+}
+
+func collectDisksStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
+	rows, err := conn.Query(ctx, `SELECT name, free_space, total_space FROM system.disks`)
 	if err != nil {
 		return err
 	}
@@ -105,22 +107,21 @@ func (e *Exporter) collectDisks(ctx context.Context) error {
 		if err := rows.Scan(&name, &free, &total); err != nil {
 			return err
 		}
-		e.diskFreeBytes.WithLabelValues(name).Set(float64(free))
-		e.diskTotalBytes.WithLabelValues(name).Set(float64(total))
+		sink.SetDiskSpace(name, float64(free), float64(total))
 	}
 	return rows.Err()
 }
 
-func (e *Exporter) collectPartsSummary(ctx context.Context) error {
+func collectPartsSummaryStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	var n uint64
-	if err := scanOneUint64(ctx, e.conn, `SELECT count() FROM system.parts WHERE active`, &n); err != nil {
+	if err := scanOneUint64(ctx, conn, `SELECT count() FROM system.parts WHERE active`, &n); err != nil {
 		return err
 	}
-	e.partsActive.Set(float64(n))
+	sink.SetPartsActive(float64(n))
 	return nil
 }
 
-func (e *Exporter) collectPartsTop(ctx context.Context) error {
+func collectPartsTopStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	q := `
 		SELECT database, table, count() AS c
 		FROM system.parts
@@ -129,7 +130,7 @@ func (e *Exporter) collectPartsTop(ctx context.Context) error {
 		ORDER BY c DESC
 		LIMIT ?
 	`
-	rows, err := e.conn.Query(ctx, q, e.cfg.PartsTopN)
+	rows, err := conn.Query(ctx, q, sink.PartsTopN())
 	if err != nil {
 		return err
 	}
@@ -140,8 +141,26 @@ func (e *Exporter) collectPartsTop(ctx context.Context) error {
 		if err := rows.Scan(&db, &tbl, &c); err != nil {
 			return err
 		}
-		e.partsPerTable.WithLabelValues(db, tbl).Set(float64(c))
+		sink.ObserveTableActiveParts(db, tbl, float64(c))
 	}
+	return rows.Err()
+}
+
+// collectDemoSystemOneStep is a minimal example of adding a new step via registry.
+func collectDemoSystemOneStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
+	var one uint8
+	rows, err := conn.Query(ctx, `SELECT 1 FROM system.one`)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		return rows.Err()
+	}
+	if err := rows.Scan(&one); err != nil {
+		return err
+	}
+	sink.SetDemoSystemOne(float64(one))
 	return rows.Err()
 }
 

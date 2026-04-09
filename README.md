@@ -31,9 +31,30 @@ go run ./cmd/ch-exporter/
 ## Конфигурация
 
 - Файл: `ch-exporter -config examples/config.yaml`
-- Переменные окружения с префиксом `CH_EXPORTER_`: см. [internal/config/config.go](internal/config/config.go) (`LISTEN_ADDRESS`, `DSN`, `ADDRESS`, `PROFILE`, `PARTS_TOP_N`, TLS).
+- Готовые пресеты:
+  - `examples/profiles/safe.yaml`
+  - `examples/profiles/extended.yaml`
+  - `examples/profiles/aggressive.yaml`
+- Переменные окружения с префиксом `CH_EXPORTER_`: см. [internal/config/config.go](internal/config/config.go) (`LISTEN_ADDRESS`, `DSN`, `ADDRESS`, `PROFILE`, `PARTS_TOP_N`, `QUERY_TIMEOUT`, TLS, allowlist/denylist).
+- Если часть `system.*` недоступна в конкретной версии ClickHouse, соответствующий шаг коллектора автоматически отключается (fail-safe), чтобы не генерировать ошибки на каждом scrape.
+- Каждый шаг коллектора выполняется с ограничением `query_timeout` (per-step timeout).
+- В `aggressive` действует жёсткий лимит `parts_top_n <= 100`.
 
 Пример DSN: `clickhouse://default@localhost:9000/default`
+
+Запуск с пресетом:
+
+```bash
+go run ./cmd/ch-exporter -config examples/profiles/extended.yaml
+```
+
+Запуск в одну команду через `make`:
+
+```bash
+make run-safe
+make run-extended
+make run-aggressive
+```
 
 ## Docker Compose
 
@@ -88,6 +109,7 @@ BASELINE_URL=http://127.0.0.1:9116/metrics make baseline-compare
 - [docs/metrics_matrix.md](docs/metrics_matrix.md) — матрица метрик и baseline
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура
 - [docs/experiments.md](docs/experiments.md) — эксперименты
+- [docs/testing_strategy.md](docs/testing_strategy.md) — стратегия тестирования
 - [docs/experiments_results_template.md](docs/experiments_results_template.md) — шаблон таблиц/выводов для ВКР
 - [docs/experiments_results_current.md](docs/experiments_results_current.md) — текущий статус прогонов
 - [docs/status.md](docs/status.md) — текущий статус и открытые задачи

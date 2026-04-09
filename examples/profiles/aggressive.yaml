@@ -1,0 +1,25 @@
+listen_address: ":9101"
+address: "localhost:9000"
+database: "default"
+username: "default"
+password: "clickhouse"
+
+profile: "aggressive"
+collect_timeout: 30s
+query_timeout: 15s
+max_open_conns: 6
+
+# Hard cap in code: <= 100
+parts_top_n: 50
+
+# Recommended to reduce noise in aggressive mode.
+system_metric_allowlist: []
+system_metric_denylist: []
+system_event_allowlist: []
+system_event_denylist: []
+async_metric_allowlist: []
+async_metric_denylist: []
+
+# Keep table label cardinality under control.
+parts_database_allowlist: []
+parts_database_denylist: ["system", "information_schema"]

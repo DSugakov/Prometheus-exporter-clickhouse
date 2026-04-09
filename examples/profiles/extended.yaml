@@ -1,0 +1,24 @@
+listen_address: ":9101"
+address: "localhost:9000"
+database: "default"
+username: "default"
+password: "clickhouse"
+
+profile: "extended"
+collect_timeout: 25s
+query_timeout: 12s
+max_open_conns: 4
+
+parts_top_n: 20
+
+# Optional filters (exact names). Keep empty to export full extended set.
+system_metric_allowlist: []
+system_metric_denylist: []
+system_event_allowlist: []
+system_event_denylist: []
+async_metric_allowlist: []
+async_metric_denylist: []
+
+# Exclude internal DB from aggressive-like table labeling if profile changes.
+parts_database_allowlist: []
+parts_database_denylist: ["system", "information_schema"]
