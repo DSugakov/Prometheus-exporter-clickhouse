@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -48,8 +49,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := context.Background()
-	conn, err := chclient.Open(ctx, cfg)
+	startupTimeout := cfg.QueryTimeout
+	if startupTimeout <= 0 || startupTimeout > 10*time.Second {
+		startupTimeout = 10 * time.Second
+	}
+	ctx, cancelStartup := context.WithTimeout(context.Background(), startupTimeout)
+	defer cancelStartup()
+	conn, err := openWithRetry(ctx, cfg, log)
 	if err != nil {
 		log.Error("clickhouse connect", "err", err)
 		os.Exit(1)
@@ -91,4 +97,28 @@ func main() {
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
 	_ = srv.Close()
+}
+
+func openWithRetry(ctx context.Context, cfg *config.Config, log *slog.Logger) (driver.Conn, error) {
+	var lastErr error
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		conn, err := chclient.Open(ctx, cfg)
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+		log.Warn("clickhouse not ready yet", "err", err)
+
+		select {
+		case <-ctx.Done():
+			if lastErr != nil {
+				return nil, lastErr
+			}
+			return nil, ctx.Err()
+		case <-ticker.C:
+		}
+	}
 }

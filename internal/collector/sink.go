@@ -30,7 +30,20 @@ func (e *Exporter) ObserveSystemEvent(name string, value float64) {
 	if !e.systemEventFilter.Allowed(name) {
 		return
 	}
-	e.systemEvent.WithLabelValues(name).Set(value)
+	prev, ok := e.prevSystemEvents[name]
+	delta := value
+	if ok {
+		if value >= prev {
+			delta = value - prev
+		} else {
+			// ClickHouse server restart/reset; start a new monotonic sequence.
+			delta = value
+		}
+	}
+	e.prevSystemEvents[name] = value
+	if delta > 0 {
+		e.systemEvent.WithLabelValues(name).Add(delta)
+	}
 }
 
 func (e *Exporter) ObserveAsyncMetric(name string, value float64) {

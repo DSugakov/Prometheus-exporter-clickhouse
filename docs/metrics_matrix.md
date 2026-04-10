@@ -25,7 +25,7 @@
 |--------------------------|-------|----------|---------|------------------|
 | `ch_exporter_up` | ops | ping | all | низкий |
 | `ch_exporter_system_metric_value` | ресурсы | `system.metrics` | safe+ | низкий (label: metric) |
-| `ch_exporter_system_event_value` | запросы | `system.events` | safe+ | низкий (label: event) |
+| `ch_exporter_system_event_total` | запросы | `system.events` | safe+ | низкий (label: event) |
 | `ch_exporter_async_metric_value` | ресурсы | `system.asynchronous_metrics` | safe+ | средний (metric name) |
 | `ch_exporter_replicas_*` | кластер | `system.replicas` | extended+ | средний |
 | `ch_exporter_merge_*` | таблицы | `system.merges` | extended+ | низкий (агрегаты) |

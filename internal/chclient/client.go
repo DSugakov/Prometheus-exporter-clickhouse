@@ -16,8 +16,8 @@ import (
 	"github.com/DSugakov/prometheus-exporter-clickhouse/internal/config"
 )
 
-// Open builds a clickhouse connection from config (native TCP).
-func Open(_ context.Context, cfg *config.Config) (clickhouse_driver.Conn, error) {
+// Open builds and verifies a clickhouse connection from config (native TCP).
+func Open(ctx context.Context, cfg *config.Config) (clickhouse_driver.Conn, error) {
 	opts := &clickhouse.Options{
 		Protocol:        clickhouse.Native,
 		DialTimeout:     5 * time.Second,
@@ -83,7 +83,14 @@ func Open(_ context.Context, cfg *config.Config) (clickhouse_driver.Conn, error)
 		opts.TLS = tc
 	}
 
-	return clickhouse.Open(opts)
+	conn, err := clickhouse.Open(opts)
+	if err != nil {
+		return nil, err
+	}
+	if err := conn.Ping(ctx); err != nil {
+		return nil, err
+	}
+	return conn, nil
 }
 
 // Ping verifies connectivity.

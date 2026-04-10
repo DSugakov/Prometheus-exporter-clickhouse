@@ -37,3 +37,12 @@ func TestPartsTopNHardLimit(t *testing.T) {
 		t.Fatal("expected error for parts_top_n hard limit")
 	}
 }
+
+func TestMaxOpenConnsInvalid(t *testing.T) {
+	c := Default()
+	c.Address = "x:9000"
+	c.MaxOpenConns = 0
+	if err := c.Validate(); err == nil {
+		t.Fatal("expected error for max_open_conns <= 0")
+	}
+}

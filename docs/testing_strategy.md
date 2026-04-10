@@ -23,6 +23,7 @@ go test ./...
 - проверка выбора шагов по профилям (`safe/extended/aggressive`);
 - graceful-degradation: шаг отключается при unsupported-schema ошибке;
 - стабильность registry (фиксированный порядок/состав шагов).
+- корректность `ch_exporter_system_event_total`: delta, reset/restart, фильтрация denylist.
 
 ### 2) Smoke-интеграция
 
@@ -87,7 +88,7 @@ docker rm -f ch-baseline
 ## Проверка cardinality-фильтров
 
 1. `system_event_allowlist`:
-- в `ch_exporter_system_event_value` остаются только указанные события.
+- в `ch_exporter_system_event_total` остаются только указанные события.
 
 2. `system_metric_denylist`:
 - запрещённые `metric` отсутствуют.

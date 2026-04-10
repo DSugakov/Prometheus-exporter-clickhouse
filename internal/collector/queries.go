@@ -7,7 +7,8 @@ import (
 )
 
 func collectSystemMetricsStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
-	rows, err := conn.Query(ctx, `SELECT metric, value FROM system.metrics`)
+	qe := NewQueryExecutor(conn)
+	rows, err := qe.Query(ctx, `SELECT metric, value FROM system.metrics`)
 	if err != nil {
 		return err
 	}
@@ -24,7 +25,8 @@ func collectSystemMetricsStep(ctx context.Context, conn driver.Conn, sink StepSi
 }
 
 func collectSystemEventsStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
-	rows, err := conn.Query(ctx, `SELECT event, value FROM system.events`)
+	qe := NewQueryExecutor(conn)
+	rows, err := qe.Query(ctx, `SELECT event, value FROM system.events`)
 	if err != nil {
 		return err
 	}
@@ -41,7 +43,8 @@ func collectSystemEventsStep(ctx context.Context, conn driver.Conn, sink StepSin
 }
 
 func collectAsyncMetricsStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
-	rows, err := conn.Query(ctx, `SELECT metric, value FROM system.asynchronous_metrics`)
+	qe := NewQueryExecutor(conn)
+	rows, err := qe.Query(ctx, `SELECT metric, value FROM system.asynchronous_metrics`)
 	if err != nil {
 		return err
 	}
@@ -59,7 +62,8 @@ func collectAsyncMetricsStep(ctx context.Context, conn driver.Conn, sink StepSin
 
 func collectReplicasStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	var cnt, maxDelay uint64
-	rows, err := conn.Query(ctx, `
+	qe := NewQueryExecutor(conn)
+	rows, err := qe.Query(ctx, `
 		SELECT count(), coalesce(max(absolute_delay), 0)
 		FROM system.replicas
 	`)
@@ -79,7 +83,8 @@ func collectReplicasStep(ctx context.Context, conn driver.Conn, sink StepSink) e
 
 func collectMergesStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	var merges uint64
-	if err := scanOneUint64(ctx, conn, `SELECT count() FROM system.merges`, &merges); err != nil {
+	qe := NewQueryExecutor(conn)
+	if err := qe.QueryOneUint64(ctx, `SELECT count() FROM system.merges`, &merges); err != nil {
 		return err
 	}
 	sink.SetMergesActive(float64(merges))
@@ -88,7 +93,8 @@ func collectMergesStep(ctx context.Context, conn driver.Conn, sink StepSink) err
 
 func collectMutationsStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	var mut uint64
-	if err := scanOneUint64(ctx, conn, `SELECT count() FROM system.mutations WHERE is_done = 0`, &mut); err != nil {
+	qe := NewQueryExecutor(conn)
+	if err := qe.QueryOneUint64(ctx, `SELECT count() FROM system.mutations WHERE is_done = 0`, &mut); err != nil {
 		return err
 	}
 	sink.SetMutationsRunning(float64(mut))
@@ -96,7 +102,8 @@ func collectMutationsStep(ctx context.Context, conn driver.Conn, sink StepSink) 
 }
 
 func collectDisksStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
-	rows, err := conn.Query(ctx, `SELECT name, free_space, total_space FROM system.disks`)
+	qe := NewQueryExecutor(conn)
+	rows, err := qe.Query(ctx, `SELECT name, free_space, total_space FROM system.disks`)
 	if err != nil {
 		return err
 	}
@@ -114,7 +121,8 @@ func collectDisksStep(ctx context.Context, conn driver.Conn, sink StepSink) erro
 
 func collectPartsSummaryStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	var n uint64
-	if err := scanOneUint64(ctx, conn, `SELECT count() FROM system.parts WHERE active`, &n); err != nil {
+	qe := NewQueryExecutor(conn)
+	if err := qe.QueryOneUint64(ctx, `SELECT count() FROM system.parts WHERE active`, &n); err != nil {
 		return err
 	}
 	sink.SetPartsActive(float64(n))
@@ -122,6 +130,7 @@ func collectPartsSummaryStep(ctx context.Context, conn driver.Conn, sink StepSin
 }
 
 func collectPartsTopStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
+	qe := NewQueryExecutor(conn)
 	q := `
 		SELECT database, table, count() AS c
 		FROM system.parts
@@ -130,7 +139,7 @@ func collectPartsTopStep(ctx context.Context, conn driver.Conn, sink StepSink) e
 		ORDER BY c DESC
 		LIMIT ?
 	`
-	rows, err := conn.Query(ctx, q, sink.PartsTopN())
+	rows, err := qe.Query(ctx, q, sink.PartsTopN())
 	if err != nil {
 		return err
 	}
@@ -149,7 +158,8 @@ func collectPartsTopStep(ctx context.Context, conn driver.Conn, sink StepSink) e
 // collectDemoSystemOneStep is a minimal example of adding a new step via registry.
 func collectDemoSystemOneStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	var one uint8
-	rows, err := conn.Query(ctx, `SELECT 1 FROM system.one`)
+	qe := NewQueryExecutor(conn)
+	rows, err := qe.Query(ctx, `SELECT 1 FROM system.one`)
 	if err != nil {
 		return err
 	}
@@ -164,17 +174,3 @@ func collectDemoSystemOneStep(ctx context.Context, conn driver.Conn, sink StepSi
 	return rows.Err()
 }
 
-func scanOneUint64(ctx context.Context, conn driver.Conn, q string, out *uint64) error {
-	rows, err := conn.Query(ctx, q)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = rows.Close() }()
-	if !rows.Next() {
-		return rows.Err()
-	}
-	if err := rows.Scan(out); err != nil {
-		return err
-	}
-	return rows.Err()
-}

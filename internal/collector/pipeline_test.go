@@ -16,9 +16,9 @@ import (
 func TestSelectStepsByProfile(t *testing.T) {
 	reg := buildStepRegistry()
 
-	safe := selectSteps(config.ProfileSafe, reg)
-	extended := selectSteps(config.ProfileExtended, reg)
-	aggressive := selectSteps(config.ProfileAggressive, reg)
+	safe := selectSteps(config.ProfileSafe, reg, nil, nil)
+	extended := selectSteps(config.ProfileExtended, reg, nil, nil)
+	aggressive := selectSteps(config.ProfileAggressive, reg, nil, nil)
 
 	if len(safe) == 0 {
 		t.Fatal("safe profile must have steps")
@@ -28,6 +28,14 @@ func TestSelectStepsByProfile(t *testing.T) {
 	}
 	if len(aggressive) <= len(extended) {
 		t.Fatalf("aggressive must include more steps than extended: extended=%d aggressive=%d", len(extended), len(aggressive))
+	}
+}
+
+func TestSelectStepsWithAllowDeny(t *testing.T) {
+	reg := buildStepRegistry()
+	got := selectSteps(config.ProfileAggressive, reg, []string{"system_metrics", "parts_top"}, []string{"parts_top"})
+	if len(got) != 1 || got[0].Name() != "system_metrics" {
+		t.Fatalf("unexpected filtered steps: %+v", got)
 	}
 }
 
@@ -81,8 +89,36 @@ func TestGracefulDisableOnUnsupportedStepError(t *testing.T) {
 	}
 }
 
+func TestHasRequiredSchema(t *testing.T) {
+	step := collectorStep{
+		name:           "parts_summary",
+		min:            config.ProfileExtended,
+		requiredTables: []string{"parts"},
+		requiredColumns: []SchemaColumn{
+			{Table: "parts", Column: "active"},
+		},
+	}
+	ok := hasRequiredSchema(
+		step,
+		map[string]struct{}{"parts": {}},
+		map[SchemaColumn]struct{}{{Table: "parts", Column: "active"}: {}},
+	)
+	if !ok {
+		t.Fatal("expected schema to be available")
+	}
+
+	missingColumn := hasRequiredSchema(
+		step,
+		map[string]struct{}{"parts": {}},
+		map[SchemaColumn]struct{}{},
+	)
+	if missingColumn {
+		t.Fatal("expected schema check to fail when required column is missing")
+	}
+}
+
 func newStepTestExporter() *Exporter {
-	return &Exporter{
+	e := &Exporter{
 		cfg: &config.Config{
 			QueryTimeout: 2 * time.Second,
 		},
@@ -104,4 +140,7 @@ func newStepTestExporter() *Exporter {
 		}, []string{"step"}),
 		disabledSteps: map[string]bool{},
 	}
+	e.timeoutPolicy = NewTimeoutPolicy(e.cfg.QueryTimeout)
+	e.errorReporter = NewStepErrorReporter(e.logger, e.scrapeErrors, e.stepLastOK, e.stepLastErr)
+	return e
 }

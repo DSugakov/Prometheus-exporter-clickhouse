@@ -19,3 +19,7 @@ parts_top_n: 20
 # Optional aggressive-label controls:
 # parts_database_allowlist: ["default", "analytics"]
 # parts_database_denylist: ["system"]
+#
+# Optional module feature flags (step names from registry):
+# module_allowlist: ["system_metrics", "system_events", "async_metrics"]
+# module_denylist: ["demo_system_one"]

@@ -38,12 +38,63 @@ Guard --> Http : bounded label set
 @enduml
 ```
 
+## C4: System Context (C1)
+
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title C1 — ClickHouse Exporter System Context
+
+Person(operator, "Operator/DevOps", "Настраивает и поддерживает мониторинг")
+System(prometheus, "Prometheus", "Скрапит метрики и хранит time-series")
+SystemDb(clickhouse, "ClickHouse", "Сервер БД, источник system.* метрик")
+System(exporter, "Prometheus-exporter-clickhouse", "Внешний экспортёр метрик ClickHouse")
+System_Ext(grafana, "Grafana/Alertmanager", "Визуализация и алертинг")
+
+Rel(operator, exporter, "Конфигурирует и запускает")
+Rel(prometheus, exporter, "Scrape /metrics", "HTTP")
+Rel(exporter, clickhouse, "Читает system.*", "Native TCP (или DSN/TLS)")
+Rel(grafana, prometheus, "Запрашивает и визуализирует")
+Rel(operator, grafana, "Смотрит дашборды и алерты")
+
+@enduml
+```
+
+## C4: Container (C2)
+
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title C2 — ClickHouse Exporter Containers
+
+Person(operator, "Operator/DevOps")
+System_Boundary(boundary, "ClickHouse Monitoring Solution") {
+  Container(prometheus, "Prometheus", "Go", "Скрапит /metrics и хранит time-series")
+  Container(exporter, "Prometheus-exporter-clickhouse", "Go", "Собирает system.* метрики по шагам registry")
+  ContainerDb(clickhouse, "ClickHouse", "DBMS", "Источник operational метрик")
+  Container(grafana, "Grafana/Alertmanager", "Grafana/Alertmanager", "Дашборды и оповещения")
+}
+
+Rel(operator, exporter, "Настраивает профили/фильтры")
+Rel(prometheus, exporter, "Scrape /metrics", "HTTP")
+Rel(exporter, clickhouse, "SQL to system.*", "Native TCP/TLS")
+Rel(grafana, prometheus, "Читает метрики")
+Rel(operator, grafana, "Наблюдает и реагирует")
+
+@enduml
+```
+
 ## Компоненты
 
 - **HTTP-сервер:** `/metrics` (Prometheus), `/healthz` (liveness), `/readyz` (readiness после успешного ping CH).
 - **Пул подключений:** один `clickhouse.Conn` на процесс; лимит открытых соединений из конфига.
 - **Оркестратор сбора:** на каждый scrape запускаются включённые коллекторы с общим контекстом и таймаутом; ошибки коллектора учитываются, остальные продолжают работу.
+- **Сериализация scrape:** `Collect()` защищён mutex (`collectMu`), чтобы исключить гонки при параллельных scrape-запросах к `/metrics`.
 - **Расширяемость через контракт шага:** `CollectorStep` + `Registry` шагов; pipeline собирается декларативно по профилю (`safe/extended/aggressive`) без правок цикла `Collect`.
+- **Feature detection:** перед запуском шага проверяется доступность требуемой схемы `system.*`: таблицы (`RequiredTables`) и опциональные колонки (`RequiredColumns`), затем действует fallback fail-safe по ошибкам схемы.
+- **Общие сервисы коллекторов:** SQL выполняется через `QueryExecutor`, per-step budget задаётся `TimeoutPolicy`, статус/ошибки шагов публикуются через `StepErrorReporter`.
 - **Per-step timeout:** каждый шаг коллектора ограничен `query_timeout`, чтобы один тяжёлый запрос не съедал весь `collect_timeout`.
 - **Fail-safe по версиям CH:** если шаг падает из-за отсутствующей `system.*` таблицы/колонки (`Unknown table`, `Unknown identifier` и т.п.), шаг автоматически отключается до рестарта процесса и перестаёт зашумлять логи/ошибки scrape.
 - **Коллекторы (по профилю):**
@@ -55,6 +106,7 @@ Guard --> Http : bounded label set
 
 - Файл YAML и/или переменные окружения `CH_EXPORTER_*`.
 - Поля: адрес CH, пользователь, пароль, TLS, `profile`, таймауты, `parts_top_n` для aggressive.
+- Есть feature flags на уровне модулей: `module_allowlist` / `module_denylist`.
 - Cardinality controls:
   - allowlist/denylist для `system.metrics`, `system.events`, `system.asynchronous_metrics`;
   - allowlist/denylist баз данных для `parts_top`;
@@ -64,6 +116,7 @@ Guard --> Http : bounded label set
 
 - Префикс `ch_exporter_` для пространства имён проекта.
 - Лейблы: только стабильные идентификаторы (имена метрик CH, диски, при aggressive — ограниченный набор database/table).
+- Для `system.events` используется counter-семантика: `ch_exporter_system_event_total`.
 - Метрики состояния шагов:
   - `ch_exporter_collector_enabled{step}`
   - `ch_exporter_collector_last_success_unix{step}`

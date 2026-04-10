@@ -108,6 +108,8 @@ BASELINE_URL=http://127.0.0.1:9116/metrics make baseline-compare
 - [docks/requirements.md](docks/requirements.md) — требования
 - [docs/metrics_matrix.md](docs/metrics_matrix.md) — матрица метрик и baseline
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура
+- [docs/collector_contract.md](docs/collector_contract.md) — контракт добавления нового коллектора
+- [docs/review_requirements_accepted.md](docs/review_requirements_accepted.md) — принятые правки архитектурного ревью
 - [docs/experiments.md](docs/experiments.md) — эксперименты
 - [docs/testing_strategy.md](docs/testing_strategy.md) — стратегия тестирования
 - [docs/experiments_results_template.md](docs/experiments_results_template.md) — шаблон таблиц/выводов для ВКР

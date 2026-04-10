@@ -52,6 +52,10 @@ type Config struct {
 	// Optional label-level control for aggressive table labels.
 	PartsDatabaseAllowlist []string `yaml:"parts_database_allowlist"`
 	PartsDatabaseDenylist  []string `yaml:"parts_database_denylist"`
+
+	// Optional module-level feature flags (step names from collector registry).
+	ModuleAllowlist []string `yaml:"module_allowlist"`
+	ModuleDenylist  []string `yaml:"module_denylist"`
 }
 
 // TLS optional client settings.
@@ -115,6 +119,11 @@ func ApplyEnv(c *Config) {
 			c.QueryTimeout = d
 		}
 	}
+	if v := os.Getenv("CH_EXPORTER_MAX_OPEN_CONNS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			c.MaxOpenConns = n
+		}
+	}
 	if v := os.Getenv("CH_EXPORTER_TLS_CA_FILE"); v != "" {
 		c.TLS.CAFile = v
 		c.TLS.Enabled = true
@@ -157,6 +166,12 @@ func ApplyEnv(c *Config) {
 	if v := os.Getenv("CH_EXPORTER_PARTS_DATABASE_DENYLIST"); v != "" {
 		c.PartsDatabaseDenylist = parseCSV(v)
 	}
+	if v := os.Getenv("CH_EXPORTER_MODULE_ALLOWLIST"); v != "" {
+		c.ModuleAllowlist = parseCSV(v)
+	}
+	if v := os.Getenv("CH_EXPORTER_MODULE_DENYLIST"); v != "" {
+		c.ModuleDenylist = parseCSV(v)
+	}
 }
 
 // Validate checks required fields.
@@ -174,6 +189,9 @@ func (c *Config) Validate() error {
 	}
 	if c.QueryTimeout <= 0 {
 		return fmt.Errorf("query_timeout must be > 0")
+	}
+	if c.MaxOpenConns <= 0 {
+		return fmt.Errorf("max_open_conns must be > 0")
 	}
 	if c.PartsTopN <= 0 {
 		return fmt.Errorf("parts_top_n must be > 0")

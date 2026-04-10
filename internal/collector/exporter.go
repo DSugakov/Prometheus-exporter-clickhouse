@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -25,7 +26,7 @@ type Exporter struct {
 	buildInfo *prometheus.GaugeVec
 
 	systemMetric *prometheus.GaugeVec
-	systemEvent  *prometheus.GaugeVec
+	systemEvent  *prometheus.CounterVec
 	asyncMetric  *prometheus.GaugeVec
 
 	// Extended + aggressive
@@ -59,9 +60,16 @@ type Exporter struct {
 	systemEventFilter  nameFilter
 	asyncMetricFilter  nameFilter
 	partsDBFilter      nameFilter
+	prevSystemEvents   map[string]float64
 
 	registry []CollectorStep
 	steps    []CollectorStep
+	knownSystemTables  map[string]struct{}
+	knownSystemColumns map[SchemaColumn]struct{}
+	schemaOnce         sync.Once
+	schemaErr          error
+	timeoutPolicy      TimeoutPolicy
+	errorReporter      StepErrorReporter
 }
 
 // New registers metrics on reg and returns Exporter.
@@ -85,10 +93,10 @@ func New(cfg *config.Config, conn driver.Conn, logger *slog.Logger, version stri
 			Name:      "system_metric_value",
 			Help:      "Value from system.metrics.",
 		}, []string{"metric"}),
-		systemEvent: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		systemEvent: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "system_event_value",
-			Help:      "Value from system.events (cumulative counter in CH).",
+			Name:      "system_event_total",
+			Help:      "Delta-normalized counter from system.events.",
 		}, []string{"event"}),
 		asyncMetric: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -126,8 +134,11 @@ func New(cfg *config.Config, conn driver.Conn, logger *slog.Logger, version stri
 		systemEventFilter:  newNameFilter(cfg.SystemEventAllowlist, cfg.SystemEventDenylist),
 		asyncMetricFilter:  newNameFilter(cfg.AsyncMetricAllowlist, cfg.AsyncMetricDenylist),
 		partsDBFilter:      newNameFilter(cfg.PartsDatabaseAllowlist, cfg.PartsDatabaseDenylist),
+		prevSystemEvents:   map[string]float64{},
 		registry:           buildStepRegistry(),
+		timeoutPolicy:      NewTimeoutPolicy(cfg.QueryTimeout),
 	}
+	e.errorReporter = NewStepErrorReporter(logger, e.scrapeErrors, e.stepLastOK, e.stepLastErr)
 
 	e.buildInfo.WithLabelValues(version).Set(1)
 
@@ -183,7 +194,7 @@ func New(cfg *config.Config, conn driver.Conn, logger *slog.Logger, version stri
 			}, []string{"database", "table"})
 		}
 	}
-	e.steps = selectSteps(cfg.Profile, e.registry)
+	e.steps = selectSteps(cfg.Profile, e.registry, cfg.ModuleAllowlist, cfg.ModuleDenylist)
 
 	reg.MustRegister(e)
 	return e
@@ -227,7 +238,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	defer cancel()
 
 	e.systemMetric.Reset()
-	e.systemEvent.Reset()
 	e.asyncMetric.Reset()
 	if e.extended {
 		e.diskFreeBytes.Reset()
@@ -284,31 +294,127 @@ func (e *Exporter) executeStep(ctx context.Context, name string, fn func(context
 		return nil
 	}
 	e.stepEnabled.WithLabelValues(name).Set(1)
-
-	stepCtx := ctx
-	cancelStep := func() {}
-	if e.cfg.QueryTimeout > 0 {
-		stepCtx, cancelStep = context.WithTimeout(ctx, e.cfg.QueryTimeout)
+	if !e.stepSchemaAvailable(name) {
+		schemaErr := fmt.Errorf("required system schema is unavailable")
+		e.errorReporter.OnUnsupported(name, schemaErr)
+		e.disableStep(name, schemaErr)
+		e.stepEnabled.WithLabelValues(name).Set(0)
+		return nil
 	}
+
+	stepCtx, cancelStep := e.timeoutPolicy.StepContext(ctx)
 	defer cancelStep()
 
 	t0 := time.Now()
 	err := fn(stepCtx)
 	if err != nil {
-		e.stepLastErr.WithLabelValues(name).Set(float64(time.Now().Unix()))
 		if isUnsupportedSchemaError(err) {
+			e.errorReporter.OnUnsupported(name, err)
 			e.disableStep(name, err)
 			e.stepEnabled.WithLabelValues(name).Set(0)
 			e.scrapeDur.WithLabelValues(name).Observe(time.Since(t0).Seconds())
 			return nil
 		}
-		e.scrapeErrors.WithLabelValues(name).Inc()
-		e.logger.Warn("scrape step failed", "step", name, "err", err)
+		e.errorReporter.OnFailure(name, err)
 	} else {
-		e.stepLastOK.WithLabelValues(name).Set(float64(time.Now().Unix()))
+		e.errorReporter.OnSuccess(name)
 	}
 	e.scrapeDur.WithLabelValues(name).Observe(time.Since(t0).Seconds())
 	return nil
+}
+
+func (e *Exporter) stepSchemaAvailable(name string) bool {
+	step := e.findStep(name)
+	if step == nil {
+		return true
+	}
+	e.schemaOnce.Do(e.loadSystemSchema)
+	if e.schemaErr != nil {
+		// Do not disable steps on transient detection failures.
+		return true
+	}
+	return hasRequiredSchema(step, e.knownSystemTables, e.knownSystemColumns)
+}
+
+func (e *Exporter) findStep(name string) CollectorStep {
+	for _, s := range e.steps {
+		if s.Name() == name {
+			return s
+		}
+	}
+	return nil
+}
+
+func (e *Exporter) loadSystemSchema() {
+	tables, err := e.loadSystemTables(context.Background())
+	if err != nil {
+		e.schemaErr = err
+		return
+	}
+	columns, err := e.loadSystemColumns(context.Background())
+	if err != nil {
+		e.schemaErr = err
+		return
+	}
+	e.knownSystemTables = tables
+	e.knownSystemColumns = columns
+	e.schemaErr = nil
+}
+
+func (e *Exporter) loadSystemTables(ctx context.Context) (map[string]struct{}, error) {
+	qe := NewQueryExecutor(e.conn)
+	rows, err := qe.Query(ctx, `SELECT name FROM system.tables WHERE database='system'`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[string]struct{}{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		out[name] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (e *Exporter) loadSystemColumns(ctx context.Context) (map[SchemaColumn]struct{}, error) {
+	qe := NewQueryExecutor(e.conn)
+	rows, err := qe.Query(ctx, `SELECT table, name FROM system.columns WHERE database='system'`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[SchemaColumn]struct{}{}
+	for rows.Next() {
+		var table, col string
+		if err := rows.Scan(&table, &col); err != nil {
+			return nil, err
+		}
+		out[SchemaColumn{Table: table, Column: col}] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func hasRequiredSchema(step CollectorStep, knownTables map[string]struct{}, knownColumns map[SchemaColumn]struct{}) bool {
+	for _, tbl := range step.RequiredTables() {
+		if _, ok := knownTables[tbl]; !ok {
+			return false
+		}
+	}
+	for _, col := range step.RequiredColumns() {
+		if _, ok := knownColumns[col]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (e *Exporter) isStepDisabled(step string) bool {
