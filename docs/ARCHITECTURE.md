@@ -1,5 +1,53 @@
 # Архитектура экспортёра
 
+## C4: System Context (C1)
+
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title C1 — ClickHouse Exporter System Context
+
+Person(operator, "Operator/DevOps", "Настраивает и поддерживает мониторинг")
+System(prometheus, "Prometheus", "Скрапит метрики и хранит time-series")
+SystemDb(clickhouse, "ClickHouse", "Сервер БД, источник system.* метрик")
+System(exporter, "Prometheus-exporter-clickhouse", "Внешний экспортёр метрик ClickHouse")
+System_Ext(grafana, "Grafana/Alertmanager", "Визуализация и алертинг")
+
+Rel(operator, exporter, "Конфигурирует и запускает")
+Rel(prometheus, exporter, "Scrape /metrics", "HTTP")
+Rel(exporter, clickhouse, "Читает system.*", "Native TCP (или DSN/TLS)")
+Rel(grafana, prometheus, "Запрашивает и визуализирует")
+Rel(operator, grafana, "Смотрит дашборды и алерты")
+
+@enduml
+```
+
+## C4: Container (C2)
+
+```plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title C2 — ClickHouse Exporter Containers
+
+Person(operator, "Operator/DevOps")
+System_Boundary(boundary, "ClickHouse Monitoring Solution") {
+  Container(prometheus, "Prometheus", "Go", "Скрапит /metrics и хранит time-series")
+  Container(exporter, "Prometheus-exporter-clickhouse", "Go", "Собирает system.* метрики по шагам registry")
+  ContainerDb(clickhouse, "ClickHouse", "DBMS", "Источник operational метрик")
+  Container(grafana, "Grafana/Alertmanager", "Grafana/Alertmanager", "Дашборды и оповещения")
+}
+
+Rel(operator, exporter, "Настраивает профили/фильтры")
+Rel(prometheus, exporter, "Scrape /metrics", "HTTP")
+Rel(exporter, clickhouse, "SQL to system.*", "Native TCP/TLS")
+Rel(grafana, prometheus, "Читает метрики")
+Rel(operator, grafana, "Наблюдает и реагирует")
+
+@enduml
+```
+
 ## Компоненты
 
 - **HTTP-сервер:** `/metrics` (Prometheus), `/healthz` (liveness), `/readyz` (readiness после успешного ping CH).
