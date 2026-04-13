@@ -91,25 +91,6 @@ docker compose down -v
 make ci
 ```
 
-Снять snapshot метрик и сохранить summary:
-
-```bash
-PROFILE=extended make metrics-snapshot
-```
-
-Сравнить с baseline exporter (должен быть доступен по `BASELINE_URL`):
-
-```bash
-BASELINE_URL=http://127.0.0.1:9116/metrics make baseline-compare
-```
-
-## Документация
-
-- [docks/requirements.md](docks/requirements.md) — требования
-- [docs/metrics_matrix.md](docs/metrics_matrix.md) — матрица метрик и baseline
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура
-- [docs/experiments.md](docs/experiments.md) — эксперименты
-
 ## Права в ClickHouse
 
 См. [docks/grants_example.sql](docks/grants_example.sql).

@@ -3,3 +3,9 @@
 *.exe
 .env
 .DS_Store
+
+# Non-production thesis/report materials
+docks/VKR_*.md
+docs/experiments*.md
+docs/metrics_matrix.md
+docks/requirements.md
