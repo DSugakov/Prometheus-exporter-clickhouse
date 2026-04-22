@@ -64,13 +64,23 @@ type Exporter struct {
 
 	registry []CollectorStep
 	steps    []CollectorStep
-	knownSystemTables  map[string]struct{}
-	knownSystemColumns map[SchemaColumn]struct{}
-	schemaOnce         sync.Once
-	schemaErr          error
-	timeoutPolicy      TimeoutPolicy
-	errorReporter      StepErrorReporter
+	knownSystemTables   map[string]struct{}
+	knownSystemColumns  map[SchemaColumn]struct{}
+	schemaMu            sync.RWMutex
+	schemaLoadedAt      time.Time
+	schemaRefreshWindow time.Duration
+	schemaProbeFn       func(context.Context) (map[string]struct{}, map[SchemaColumn]struct{}, error)
+	timeoutPolicy       TimeoutPolicy
+	errorReporter       StepErrorReporter
 }
+
+type schemaAvailability int
+
+const (
+	schemaAvailable schemaAvailability = iota
+	schemaMissing
+	schemaUnknown
+)
 
 // New registers metrics on reg and returns Exporter.
 func New(cfg *config.Config, conn driver.Conn, logger *slog.Logger, version string, reg prometheus.Registerer) *Exporter {
@@ -137,6 +147,7 @@ func New(cfg *config.Config, conn driver.Conn, logger *slog.Logger, version stri
 		prevSystemEvents:   map[string]float64{},
 		registry:           buildStepRegistry(),
 		timeoutPolicy:      NewTimeoutPolicy(cfg.QueryTimeout),
+		schemaRefreshWindow: 5 * time.Minute,
 	}
 	e.errorReporter = NewStepErrorReporter(logger, e.scrapeErrors, e.stepLastOK, e.stepLastErr)
 
@@ -290,16 +301,24 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 func (e *Exporter) executeStep(ctx context.Context, name string, fn func(context.Context) error) error {
 	if e.isStepDisabled(name) {
-		e.stepEnabled.WithLabelValues(name).Set(0)
-		return nil
+		switch e.stepSchemaAvailability(ctx, name) {
+		case schemaAvailable:
+			e.enableStep(name)
+		case schemaMissing, schemaUnknown:
+			e.stepEnabled.WithLabelValues(name).Set(0)
+			return nil
+		}
 	}
 	e.stepEnabled.WithLabelValues(name).Set(1)
-	if !e.stepSchemaAvailable(name) {
+	switch e.stepSchemaAvailability(ctx, name) {
+	case schemaMissing:
 		schemaErr := fmt.Errorf("required system schema is unavailable")
 		e.errorReporter.OnUnsupported(name, schemaErr)
 		e.disableStep(name, schemaErr)
 		e.stepEnabled.WithLabelValues(name).Set(0)
 		return nil
+	case schemaUnknown:
+		// Keep step enabled on transient schema detection failures.
 	}
 
 	stepCtx, cancelStep := e.timeoutPolicy.StepContext(ctx)
@@ -323,17 +342,24 @@ func (e *Exporter) executeStep(ctx context.Context, name string, fn func(context
 	return nil
 }
 
-func (e *Exporter) stepSchemaAvailable(name string) bool {
+func (e *Exporter) stepSchemaAvailability(ctx context.Context, name string) schemaAvailability {
 	step := e.findStep(name)
 	if step == nil {
-		return true
+		return schemaAvailable
 	}
-	e.schemaOnce.Do(e.loadSystemSchema)
-	if e.schemaErr != nil {
+	if err := e.refreshSystemSchema(ctx); err != nil {
 		// Do not disable steps on transient detection failures.
-		return true
+		e.logger.Warn("schema capability detection failed, keeping step enabled", "step", name, "err", err)
+		return schemaUnknown
 	}
-	return hasRequiredSchema(step, e.knownSystemTables, e.knownSystemColumns)
+	e.schemaMu.RLock()
+	tables := e.knownSystemTables
+	columns := e.knownSystemColumns
+	e.schemaMu.RUnlock()
+	if hasRequiredSchema(step, tables, columns) {
+		return schemaAvailable
+	}
+	return schemaMissing
 }
 
 func (e *Exporter) findStep(name string) CollectorStep {
@@ -345,20 +371,42 @@ func (e *Exporter) findStep(name string) CollectorStep {
 	return nil
 }
 
-func (e *Exporter) loadSystemSchema() {
-	tables, err := e.loadSystemTables(context.Background())
-	if err != nil {
-		e.schemaErr = err
-		return
+func (e *Exporter) refreshSystemSchema(ctx context.Context) error {
+	e.schemaMu.RLock()
+	hasCache := e.knownSystemTables != nil && e.knownSystemColumns != nil
+	isFresh := hasCache && time.Since(e.schemaLoadedAt) < e.schemaRefreshWindow
+	e.schemaMu.RUnlock()
+	if isFresh {
+		return nil
 	}
-	columns, err := e.loadSystemColumns(context.Background())
-	if err != nil {
-		e.schemaErr = err
-		return
+
+	var (
+		tables map[string]struct{}
+		columns map[SchemaColumn]struct{}
+		err error
+	)
+	if e.schemaProbeFn != nil {
+		tables, columns, err = e.schemaProbeFn(ctx)
+		if err != nil {
+			return err
+		}
+	} else {
+		tables, err = e.loadSystemTables(ctx)
+		if err != nil {
+			return err
+		}
+		columns, err = e.loadSystemColumns(ctx)
+		if err != nil {
+			return err
+		}
 	}
+
+	e.schemaMu.Lock()
 	e.knownSystemTables = tables
 	e.knownSystemColumns = columns
-	e.schemaErr = nil
+	e.schemaLoadedAt = time.Now()
+	e.schemaMu.Unlock()
+	return nil
 }
 
 func (e *Exporter) loadSystemTables(ctx context.Context) (map[string]struct{}, error) {
@@ -434,12 +482,24 @@ func (e *Exporter) disableStep(step string, err error) {
 		return
 	}
 	e.logger.Warn(
-		"collector step disabled due to unsupported schema",
+		"collector step temporarily disabled due to unsupported schema",
 		"step",
 		step,
 		"err",
 		err,
 	)
+}
+
+func (e *Exporter) enableStep(step string) {
+	e.stepMu.Lock()
+	wasDisabled := e.disabledSteps[step]
+	if wasDisabled {
+		delete(e.disabledSteps, step)
+	}
+	e.stepMu.Unlock()
+	if wasDisabled {
+		e.logger.Info("collector step re-enabled after schema check", "step", step)
+	}
 }
 
 func isUnsupportedSchemaError(err error) bool {

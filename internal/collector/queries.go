@@ -131,15 +131,12 @@ func collectPartsSummaryStep(ctx context.Context, conn driver.Conn, sink StepSin
 
 func collectPartsTopStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	qe := NewQueryExecutor(conn)
-	q := `
-		SELECT database, table, count() AS c
-		FROM system.parts
-		WHERE active
-		GROUP BY database, table
-		ORDER BY c DESC
-		LIMIT ?
-	`
-	rows, err := qe.Query(ctx, q, sink.PartsTopN())
+	q, args := buildPartsTopQuery(
+		sink.PartsDatabaseAllowlist(),
+		sink.PartsDatabaseDenylist(),
+		sink.PartsTopN(),
+	)
+	rows, err := qe.Query(ctx, q, args...)
 	if err != nil {
 		return err
 	}
@@ -153,6 +150,30 @@ func collectPartsTopStep(ctx context.Context, conn driver.Conn, sink StepSink) e
 		sink.ObserveTableActiveParts(db, tbl, float64(c))
 	}
 	return rows.Err()
+}
+
+func buildPartsTopQuery(allowDBs, denyDBs []string, limit int) (string, []any) {
+	q := `
+		SELECT database, table, count() AS c
+		FROM system.parts
+		WHERE active
+	`
+	args := make([]any, 0, 3)
+	if len(allowDBs) > 0 {
+		q += " AND has(?, database)"
+		args = append(args, allowDBs)
+	}
+	if len(denyDBs) > 0 {
+		q += " AND NOT has(?, database)"
+		args = append(args, denyDBs)
+	}
+	q += `
+		GROUP BY database, table
+		ORDER BY c DESC
+		LIMIT ?
+	`
+	args = append(args, limit)
+	return q, args
 }
 
 // collectDemoSystemOneStep is a minimal example of adding a new step via registry.

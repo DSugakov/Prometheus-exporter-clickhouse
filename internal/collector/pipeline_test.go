@@ -9,6 +9,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 
 	"github.com/DSugakov/prometheus-exporter-clickhouse/internal/config"
 )
@@ -114,6 +115,72 @@ func TestHasRequiredSchema(t *testing.T) {
 	)
 	if missingColumn {
 		t.Fatal("expected schema check to fail when required column is missing")
+	}
+}
+
+func TestDisabledStepNotReenabledOnSchemaRefreshError(t *testing.T) {
+	e := newStepTestExporter()
+	e.disabledSteps["replicas"] = true
+	e.steps = []CollectorStep{
+		collectorStep{
+			name:           "replicas",
+			min:            config.ProfileExtended,
+			requiredTables: []string{"replicas"},
+		},
+	}
+	e.schemaProbeFn = func(context.Context) (map[string]struct{}, map[SchemaColumn]struct{}, error) {
+		return nil, nil, errString("transient schema probe failure")
+	}
+
+	called := false
+	err := e.executeStep(context.Background(), "replicas", func(context.Context) error {
+		called = true
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("execute step returned error: %v", err)
+	}
+	if called {
+		t.Fatal("disabled step must not execute when schema probe fails transiently")
+	}
+	if !e.isStepDisabled("replicas") {
+		t.Fatal("step must remain disabled on transient schema probe failure")
+	}
+	if got := testutil.ToFloat64(e.stepEnabled.WithLabelValues("replicas")); got != 0 {
+		t.Fatalf("step must be reported as disabled, got %v", got)
+	}
+}
+
+func TestDisabledStepReenabledAfterSchemaRecovery(t *testing.T) {
+	e := newStepTestExporter()
+	e.disabledSteps["replicas"] = true
+	e.steps = []CollectorStep{
+		collectorStep{
+			name:           "replicas",
+			min:            config.ProfileExtended,
+			requiredTables: []string{"replicas"},
+		},
+	}
+	e.schemaProbeFn = func(context.Context) (map[string]struct{}, map[SchemaColumn]struct{}, error) {
+		return map[string]struct{}{"replicas": {}}, map[SchemaColumn]struct{}{}, nil
+	}
+
+	called := false
+	err := e.executeStep(context.Background(), "replicas", func(context.Context) error {
+		called = true
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("execute step returned error: %v", err)
+	}
+	if !called {
+		t.Fatal("step must execute after schema recovery")
+	}
+	if e.isStepDisabled("replicas") {
+		t.Fatal("step must be re-enabled after schema recovery")
+	}
+	if got := testutil.ToFloat64(e.stepEnabled.WithLabelValues("replicas")); got != 1 {
+		t.Fatalf("step must be reported as enabled, got %v", got)
 	}
 }
 

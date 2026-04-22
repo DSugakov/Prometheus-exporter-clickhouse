@@ -1,0 +1,84 @@
+@startuml
+title Потенциально полезные метрики ClickHouse в ch-exporter
+
+left to right direction
+skinparam backgroundColor #F8FAFC
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam roundcorner 12
+skinparam defaultTextAlignment left
+skinparam package {
+  BorderColor #CBD5E1
+  BackgroundColor #FFFFFF
+}
+skinparam rectangle {
+  BorderColor #94A3B8
+}
+
+actor "Инженер эксплуатации" as operator
+node "ClickHouse\n(system.*)" as ch
+rectangle "ch-exporter" as exporter
+database "Prometheus" as prom
+rectangle "Grafana / Alertmanager" as vis
+
+operator --> vis : Наблюдает состояние и алерты
+prom --> exporter : Scrape /metrics
+exporter --> ch : SQL-запросы к system.*
+vis --> prom : Запросы к time-series
+
+package "Уже отслеживаем: эксплуатация экспортера" as ops {
+  rectangle "Доступность и стабильность\n- ch_exporter_up\n- ch_exporter_build_info" as m_up
+  rectangle "Ошибки и задержки\n- ch_exporter_scrape_errors_total{step}\n- ch_exporter_scrape_step_duration_seconds{step}" as m_scrape
+  rectangle "Состояние шагов\n- ch_exporter_collector_enabled{step}\n- ch_exporter_collector_last_success_unix{step}\n- ch_exporter_collector_last_error_unix{step}" as m_steps
+}
+
+package "Уже отслеживаем: профиль safe" as safe {
+  rectangle "Ресурсы и внутренние показатели\n- ch_exporter_system_metric_value{metric}\n  (system.metrics)" as m_safe_metrics
+  rectangle "События движка\n- ch_exporter_system_event_total{event}\n  (system.events, delta-normalized)" as m_safe_events
+  rectangle "Фоновые индикаторы\n- ch_exporter_async_metric_value{metric}\n  (system.asynchronous_metrics)" as m_safe_async
+}
+
+package "Уже отслеживаем: профиль extended" as ext {
+  rectangle "Репликация\n- ch_exporter_replicas_total\n- ch_exporter_replicas_max_absolute_delay" as m_ext_rep
+  rectangle "Фоновые задачи\n- ch_exporter_merges_active\n- ch_exporter_mutations_unfinished" as m_ext_bg
+  rectangle "Хранилище\n- ch_exporter_parts_active_total\n- ch_exporter_disk_free_bytes{disk}\n- ch_exporter_disk_total_bytes{disk}" as m_ext_store
+}
+
+package "Уже отслеживаем: профиль aggressive" as aggr {
+  rectangle "Горячие таблицы по active parts\n- ch_exporter_table_active_parts{database,table}\n- ограничение parts_top_n (до 100)" as m_aggr_parts
+}
+
+package "Следующая итерация: кандидатные метрики" as next {
+  rectangle "Нагрузка запросов (без high-cardinality)\n- число активных запросов\n- число ожиданий в очереди\nИсточник: system.processes" as c_proc
+  rectangle "Задержка запросов для SLO\n- p95/p99 времени выполнения\n- доля медленных запросов\nИсточник: агрегаты из system.query_log" as c_slo
+  rectangle "Очередь репликации\n- размер backlog\n- возраст самой старой задачи\nИсточник: system.replication_queue" as c_repl
+}
+
+m_up -[hidden]- m_scrape
+m_scrape -[hidden]- m_steps
+m_safe_metrics -[hidden]- m_safe_events
+m_safe_events -[hidden]- m_safe_async
+m_ext_rep -[hidden]- m_ext_bg
+m_ext_bg -[hidden]- m_ext_store
+c_proc -[hidden]- c_slo
+c_slo -[hidden]- c_repl
+
+exporter --> m_up
+exporter --> m_scrape
+exporter --> m_steps
+exporter --> m_safe_metrics
+exporter --> m_safe_events
+exporter --> m_safe_async
+exporter --> m_ext_rep
+exporter --> m_ext_bg
+exporter --> m_ext_store
+exporter --> m_aggr_parts
+
+next ..> exporter : Расширение дорожной карты
+
+note bottom of next
+Лейблы ограничены по кардинальности:
+избегаем query_text, query_id и user-level лейблов.
+end note
+
+@enduml

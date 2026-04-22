@@ -31,7 +31,9 @@ type collectorStep struct {
 	collector       func(context.Context, driver.Conn, StepSink) error
 }
 
-func (s collectorStep) Name() string               { return s.name }
+func (s collectorStep) Name() string {
+	return s.name
+}
 func (s collectorStep) MinProfile() config.Profile { return s.min }
 func (s collectorStep) RequiredTables() []string   { return s.requiredTables }
 func (s collectorStep) RequiredColumns() []SchemaColumn {

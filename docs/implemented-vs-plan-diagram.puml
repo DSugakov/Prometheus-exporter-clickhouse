@@ -1,0 +1,39 @@
+@startuml
+title ch-exporter: реализовано / будет реализовано
+
+left to right direction
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam defaultTextAlignment left
+
+node "ClickHouse\nsystem.*" as ch
+rectangle "ch-exporter" as ex
+database "Prometheus" as pr
+rectangle "Grafana" as gr
+
+pr --> ex : /metrics
+ex --> ch : SQL
+gr --> pr
+
+package "Реализовано" {
+  rectangle "Сервис экспортера\nch_exporter_up\nch_exporter_build_info\nch_exporter_scrape_errors_total\nch_exporter_scrape_step_duration_seconds\nch_exporter_collector_enabled" as r_ops
+  rectangle "safe\nch_exporter_system_metric_value\nch_exporter_system_event_total\nch_exporter_async_metric_value" as r_safe
+  rectangle "extended\nch_exporter_replicas_total\nch_exporter_replicas_max_absolute_delay\nch_exporter_merges_active\nch_exporter_mutations_unfinished\nch_exporter_parts_active_total\nch_exporter_disk_free_bytes\nch_exporter_disk_total_bytes" as r_ext
+  rectangle "aggressive\nch_exporter_table_active_parts" as r_aggr
+}
+
+package "Будет реализовано" {
+  rectangle "Нагрузка запросов\nsystem.processes\nactive queries\nqueue wait" as p_proc
+  rectangle "SLO задержки\nsystem.query_log\np95 / p99\nslow query rate" as p_slo
+  rectangle "Очередь репликации\nsystem.replication_queue\nbacklog\noldest task age" as p_repl
+}
+
+ex --> r_ops
+ex --> r_safe
+ex --> r_ext
+ex --> r_aggr
+ch ..> p_proc
+ch ..> p_slo
+ch ..> p_repl
+
+@enduml

@@ -17,6 +17,8 @@ type StepSink interface {
 	SetDemoSystemOne(value float64)
 
 	PartsTopN() int
+	PartsDatabaseAllowlist() []string
+	PartsDatabaseDenylist() []string
 }
 
 func (e *Exporter) ObserveSystemMetric(name string, value float64) {
@@ -31,7 +33,7 @@ func (e *Exporter) ObserveSystemEvent(name string, value float64) {
 		return
 	}
 	prev, ok := e.prevSystemEvents[name]
-	delta := value
+	delta := 0.0
 	if ok {
 		if value >= prev {
 			delta = value - prev
@@ -81,4 +83,22 @@ func (e *Exporter) PartsTopN() int {
 		return config.AggressiveHardMaxPartsTopN
 	}
 	return n
+}
+
+func (e *Exporter) PartsDatabaseAllowlist() []string {
+	if len(e.cfg.PartsDatabaseAllowlist) == 0 {
+		return nil
+	}
+	out := make([]string, len(e.cfg.PartsDatabaseAllowlist))
+	copy(out, e.cfg.PartsDatabaseAllowlist)
+	return out
+}
+
+func (e *Exporter) PartsDatabaseDenylist() []string {
+	if len(e.cfg.PartsDatabaseDenylist) == 0 {
+		return nil
+	}
+	out := make([]string, len(e.cfg.PartsDatabaseDenylist))
+	copy(out, e.cfg.PartsDatabaseDenylist)
+	return out
 }

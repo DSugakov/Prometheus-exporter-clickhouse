@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -48,10 +49,16 @@ func main() {
 		log.Error("invalid config", "err", err)
 		os.Exit(1)
 	}
+	if cfg.TLS.Insecure {
+		log.Warn("TLS certificate verification is disabled (insecure_skip_verify=true)")
+	}
 
-	startupTimeout := cfg.QueryTimeout
-	if startupTimeout <= 0 || startupTimeout > 10*time.Second {
-		startupTimeout = 10 * time.Second
+	startupTimeout := cfg.CollectTimeout
+	if cfg.QueryTimeout > startupTimeout {
+		startupTimeout = cfg.QueryTimeout
+	}
+	if startupTimeout <= 0 {
+		startupTimeout = 30 * time.Second
 	}
 	ctx, cancelStartup := context.WithTimeout(context.Background(), startupTimeout)
 	defer cancelStartup()
@@ -85,18 +92,28 @@ func main() {
 	})
 
 	srv := &http.Server{Addr: cfg.ListenAddress, Handler: mux}
+	serverErr := make(chan error, 1)
 	go func() {
 		log.Info("listening", "addr", cfg.ListenAddress, "profile", cfg.Profile)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		serverErr <- srv.ListenAndServe()
+	}()
+
+	stopCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	select {
+	case <-stopCtx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Error("http shutdown", "err", err)
+		}
+	case err := <-serverErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Error("http server", "err", err)
 			os.Exit(1)
 		}
-	}()
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
-	_ = srv.Close()
+	}
 }
 
 func openWithRetry(ctx context.Context, cfg *config.Config, log *slog.Logger) (driver.Conn, error) {
