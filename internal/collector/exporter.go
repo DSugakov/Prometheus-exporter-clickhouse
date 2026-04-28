@@ -29,7 +29,6 @@ type Exporter struct {
 	systemEvent  *prometheus.CounterVec
 	asyncMetric  *prometheus.GaugeVec
 
-	// Extended + aggressive
 	replicasTotal    prometheus.Gauge
 	replicasMaxDelay prometheus.Gauge
 	mergesActive     prometheus.Gauge
@@ -38,9 +37,7 @@ type Exporter struct {
 	diskFreeBytes    *prometheus.GaugeVec
 	diskTotalBytes   *prometheus.GaugeVec
 
-	// Aggressive only
 	partsPerTable *prometheus.GaugeVec
-	// Demonstration step metric
 	demoSystemOne prometheus.Gauge
 
 	scrapeErrors *prometheus.CounterVec

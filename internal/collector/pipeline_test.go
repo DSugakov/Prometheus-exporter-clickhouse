@@ -78,7 +78,6 @@ func TestGracefulDisableOnUnsupportedStepError(t *testing.T) {
 		},
 	}
 
-	// adapter since test step doesn't need conn
 	err := e.executeStep(context.Background(), step.Name(), func(ctx context.Context) error {
 		return step.collector(ctx, nil, e)
 	})

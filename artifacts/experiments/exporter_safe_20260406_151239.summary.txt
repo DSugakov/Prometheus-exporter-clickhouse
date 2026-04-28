@@ -1,6 +1,0 @@
-profile=safe
-metrics_file=./artifacts/experiments/exporter_safe_20260406_151239.metrics
-unique_metric_names=83
-series_count=83
-scrape_bucket_lines=0
-collected_at=2026-04-06T12:12:39Z

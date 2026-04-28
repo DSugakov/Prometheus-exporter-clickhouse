@@ -3,6 +3,9 @@
 *.exe
 .env
 .DS_Store
+artifacts/experiments/*.metrics
+artifacts/experiments/*.summary.txt
+artifacts/experiments/baseline_compare_*.md
 
 # Non-production thesis/report materials
 docks/VKR_*.md

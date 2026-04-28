@@ -176,7 +176,6 @@ func buildPartsTopQuery(allowDBs, denyDBs []string, limit int) (string, []any) {
 	return q, args
 }
 
-// collectDemoSystemOneStep is a minimal example of adding a new step via registry.
 func collectDemoSystemOneStep(ctx context.Context, conn driver.Conn, sink StepSink) error {
 	var one uint8
 	qe := NewQueryExecutor(conn)
